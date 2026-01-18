@@ -299,3 +299,146 @@ cout << "ID: " << g.id << ", " << g.title << ", " << g.year << ", " << g.price <
     }
 }
 
+//---------------------------------------------------------------------------------------------//
+// Случайный выбор игры
+void PickRandomGame(const vector<Game>& games) {
+vector<Game> list = games.empty() ? ReadAllGamesFromFile() : games;
+    if (list.empty()) {
+cout << "Список игр пуст!!!\n";
+    return;
+}
+
+srand(static_cast<unsigned int>(time(0))); //генератор случайных чисел
+int randomIndex = rand() % list.size();  // здесь выбор случайного индекса
+const Game& randomGame = list[randomIndex];
+cout << "Случайно выбранная игра: " << randomGame.title << " (" << PlatformMaskToString(randomGame.platform) << ")" << endl;
+}
+
+//---------------------------------------------------------------------------------------------//
+// Сохранение данных в файл
+void SaveAndExit(const vector<Game>& games, const string& filename = "igri.bin") {
+ofstream out(filename, ios::binary | ios::trunc);
+    for (const auto& game : games) {
+out.write(reinterpret_cast<const char*>(&game), sizeof(Game));
+}
+out.close();
+cout << "Все изменения сохранены\n";
+}
+
+
+int main() {
+// для вывода кириллицы
+SetConsoleEncoding();
+
+vector<Game> games;
+
+int choice;
+bool changesSaved = false; // Специальный флаг для отслеживания, сохранялись ли изменения
+    while (true) {
+cout << "\n~=~=~=~=~=~=~=КОНСОЛЬНАЯ МЕНЮШКА~=~=~=~=~=~=~=:\n";
+cout << "1. Посмотреть все игры\n";
+cout << "2. Добавить игру\n";
+cout << "3. Удалить игру\n";
+cout << "4. Фильтровать игры по разным критериям\n";
+cout << "5. Случайный выбор игры\n";
+cout << "6. Сохранить и выйти\n";
+cout << "Выберите нужную функцию: ";
+cin >> choice;
+cin.ignore();
+
+    if (choice == 1) {
+ViewAllGames();
+}
+    else if (choice == 2) {
+int id = generateNextId();
+
+Game g = inputNewGame(id);
+
+AddGame(g);
+games.push_back(g);
+changesSaved = false;
+}
+    else if (choice == 3) {
+
+int id;
+cout << "Введите ID игры для удаления: ";
+cin >> id;
+DeleteGame(id);
+games = ReadAllGamesFromFile(); 
+changesSaved = false;
+changesSaved = false;
+cin.ignore(10000, '\n');
+}
+    else if (choice == 4) {
+
+    while (true) {
+cout << "\n~=~=~=~=~=~=~=Меню фильтровв~=~=~=~=~=~=~=\n";
+cout << "1. Фильтр по цене (самые дешёвые или же самые дорогие)\n";
+cout << "2. Фильтр по году (старые или новые)\n";
+cout << "3. Фильтр по статусу (пройдена или не пройдена)\n";
+cout << "4. Выйти из меню фильтров\n";
+cout << "Выберите фильтр: ";
+int fchoice;
+    if (!(cin >> fchoice)) { cin.clear(); cin.ignore(10000, '\n'); cout << "Неверный ввод\n"; continue; }
+cin.ignore(10000, '\n');
+
+    if (fchoice == 1) {
+int priceChoice;
+cout << "Фильтр по самым дешевым играм (0) или самым дорогим (1) играм? ";
+cin >> priceChoice;
+cin.ignore(10000, '\n');
+FilterGame(games, priceChoice == 0);
+}
+    else if (fchoice == 2) {
+int mode;
+cout << "Показать старые (0) или новые (1) игры? ";
+cin >> mode;
+cout << "Введите пороговый год (например 2015): ";
+int threshold;
+cin >> threshold;
+cin.ignore(10000, '\n');
+FilterByYear(games, threshold, mode == 0);
+}
+    else if (fchoice == 3) {
+int st;
+cout << "Показать не пройденные (0) или пройденные (1) игры? ";
+cin >> st;
+cin.ignore(10000, '\n');
+FilterByStatus(games, st == 1);
+}
+    else if (fchoice == 4) {
+
+    break;
+}
+    else {
+cout << "Неверный выбор в меню фильтров.\n";
+        }
+    }
+}
+    else if (choice == 5) {
+PickRandomGame(games);
+}
+    else if (choice == 6) {
+    if (!changesSaved) {
+cout << "Сохранить изменения в файл?? (1 - ага, 0 - неее): ";
+int saveChoice;
+cin >> saveChoice;
+if (saveChoice == 1) {
+SaveAndExit(games);
+}
+    else {
+cout << "Изменения не сохранены :(\n";
+    }
+}
+    else {
+cout << "Все изменения сохранены ураа\n";
+}
+    break;
+}
+    else {
+cout << "Неверный выбор. Попробуйте снова.\n";
+    }
+}
+
+    return 0;
+}
