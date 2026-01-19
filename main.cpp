@@ -220,7 +220,7 @@ cout << "Игра с id " << id << " удалена.\n";
 }
 
 //---------------------------------------------------------------------------------------------//
-//  Показать все игры в списке
+//  Показать все игры в списке  (новый обновлённый интерфейс уже)
 void ViewAllGames(const string& filename = "igri.bin") {
 ifstream in(filename, ios::binary);
     if (!in) {
@@ -228,12 +228,57 @@ cout << "Файл пуст или его вообще не создали\n";
     return;
 }
 
+vector<Game> list;
 Game tmp;
     while (in.read(reinterpret_cast<char*>(&tmp), sizeof(Game))) {
-cout << "ID: " << tmp.id << ", Название: " << tmp.title << ", Платформа: " << PlatformMaskToString(tmp.platform) << ", Год: " << tmp.year << ", Цена: " << tmp.price << ", Пройдено или нет?: " << (tmp.isCompleted ? "Да" : "Нет") << endl;
-    }
-in.close();
+list.push_back(tmp);
 }
+in.close();
+
+    if (list.empty()) {
+cout << "Файл пуст или его вообще не создали\n";
+    return;
+}
+
+auto PadRight = [](const string &s, int w) -> string {
+    if ((int)s.size() >= w) return s.substr(0, w);
+        return s + string(w - (int)s.size(), ' ');
+};
+auto FormatPrice = [](double price) -> string {
+string s = to_string(price);
+size_t pos = s.find('.');
+    if (pos == string::npos) return s + ".00";
+    if (pos + 3 <= s.size()) return s.substr(0, pos + 3);
+    while (s.size() < pos + 3) s += '0';
+return s;
+};
+
+const int labelWidth = 22; 
+
+    for (const auto &g : list) {
+cout << "\n";
+    for (int i = 0; i < 60; ++i) cout << '-';
+cout << '\n';
+
+string titleStr = string(g.title);
+    if (titleStr.empty()) titleStr = "Неизвестно";
+cout << "  " << titleStr << '\n';
+    for (int i = 0; i < 60; ++i) cout << '-';
+cout << '\n';
+
+cout << PadRight("ID", labelWidth)      << " : " << to_string(g.id) << '\n';
+cout << PadRight("Название", labelWidth) << " : " << titleStr << '\n';
+cout << PadRight("Платформа", labelWidth) << " : " << PlatformMaskToString(g.platform) << '\n';
+cout << PadRight("Год", labelWidth)     << " : " << to_string(g.year) << '\n';
+cout << PadRight("Цена (в руб.)", labelWidth) << " : " << FormatPrice(g.price) << '\n';
+cout << PadRight("Пройдено или нет?", labelWidth) << " : " << (g.isCompleted ? "Да" : "Нет") << '\n';
+
+    for (int i = 0; i < 60; ++i) cout << '-';
+cout << "\n\n";
+    }
+
+}
+
 //---------------------------------------------------------------------------------------------//
 // Фильтр игр по цене (выводятся либо самые дешёвые, либо самые дорогие)
 
