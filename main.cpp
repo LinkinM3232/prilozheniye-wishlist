@@ -16,6 +16,8 @@
 
 6. Сохранение в бинарный файл - за это отвечает функция SaveAndExit
 
+7. Первоначальная регистрация пользователя - RegisterInteractiveUser, а также ввод логина или пароля при помощи пользователя - LoginInteractiveLoop
+
 /*/
 
 #include <iostream>
@@ -26,6 +28,7 @@
 #include <windows.h> 
 #include <vector> 
 #include <sstream>
+#include <ctime>
 
 using namespace std;
 
@@ -326,11 +329,205 @@ cout << "Все изменения сохранены\n";
 }
 
 
+
+// Новая структура пользователь. Для регистрации и входа в аккаунт
+//---------------------------------------------------------------------------------------------//
+//---------------------------------------------------------------------------------------------//
+struct User {
+    int id;
+    char username[21];
+    char password[41]; 
+};
+
+User currentUserGlobal;
+int currentUserId = -1;
+
+
+void AddUser(const User& u, const string& filename = "login.bin") {
+ofstream out(filename, ios::binary | ios::app);
+    if (!out) {
+cerr << "Не удалось открыть файл для записи " << filename << '\n';
+    return;
+}
+out.write(reinterpret_cast<const char*>(&u), sizeof(User));
+out.close();
+}
+//---------------------------------------------------------------------------------------------//
+// Функциия, считывающая всех пользователей из файла
+vector<User> ReadAllUsersFromFileUsers(const string& filename = "login.bin") {
+vector<User> users;
+ifstream in(filename, ios::binary);
+    if (!in) return users;
+User tmp;
+    while (in.read(reinterpret_cast<char*>(&tmp), sizeof(User))) {
+users.push_back(tmp);
+}
+in.close();
+    return users;
+}
+
+//---------------------------------------------------------------------------------------------//
+// Перезапись всех пользователей в файл
+void SaveAllUsersToFile(const vector<User>& users, const string& filename = "login.bin") {
+ofstream out(filename, ios::binary | ios::trunc);
+    if (!out) {
+cerr << "Не удалось открыть файл для записи " << filename << '\n';
+    return;
+}
+    for (const auto& u : users) out.write(reinterpret_cast<const char*>(&u), sizeof(User));
+out.close();
+}
+
+//---------------------------------------------------------------------------------------------//
+// Генерация уникального id для пользователя
+int generateNextUserId(const string& filename = "login.bin") {
+ifstream in(filename, ios::binary);
+    if (!in) return 1;
+User tmp;
+int maxId = 0;
+    while (in.read(reinterpret_cast<char*>(&tmp), sizeof(User))) {
+    if (tmp.id > maxId) maxId = tmp.id;
+}
+    return maxId + 1;
+}
+
+//---------------------------------------------------------------------------------------------//
+// Проверка, существует ли имя пользователя
+bool UsernameExists(const string& name, const string& filename = "login.bin") {
+auto users = ReadAllUsersFromFileUsers(filename);
+    for (const auto& u : users) {
+    if (name == string(u.username)) return true;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------------------------//
+
+// Аутентификация
+bool AuthenticateUser(const string& name, const string& password, User& outUser, const string& filename = "login.bin") {
+auto users = ReadAllUsersFromFileUsers(filename);
+    for (const auto& u : users) {
+    if (name == string(u.username) && password == string(u.password)) {
+outUser = u;
+    return true;
+    }
+}
+    return false;
+}
+
+//---------------------------------------------------------------------------------------------//
+// Интерактивная регистрация (вставить вызов из EnsureAuthenticated при первом запуске)
+void RegisterInteractiveUser(const string& filename = "login.bin") {
+cout << "\n-+-+-+-+-+-+Регистрация пользователя-+-+-+-+-+-+\n";
+string name;
+    while (true) {
+cout << "Введите ваш логин (1-20 символов): ";
+getline(cin, name);
+auto lpos = name.find_first_not_of(" \t\r\n");
+auto rpos = name.find_last_not_of(" \t\r\n");
+    if (lpos == string::npos) name = "";
+    else name = name.substr(lpos, rpos - lpos + 1);
+    if (name.empty()) { cout << "Логин не может быть пустым!!\n"; continue; }
+    if (name.size() > 20) name = name.substr(0, 20);
+    if (UsernameExists(name, filename)) {
+cout << "Пользователь с таким логином уже существует. Введите другой логин\n";
+    continue;
+}
+    break;
+}
+
+string pass;
+    while (true) {
+cout << "Введите пароль (1-40 символов): ";
+getline(cin, pass);
+    if (pass.empty()) { cout << "Пароль не может быть пустым!!!!!\n"; continue; }
+    if (pass.size() > 40) pass = pass.substr(0, 40);
+    break;
+}
+
+User u{};
+    u.id = generateNextUserId(filename);
+    strncpy(u.username, name.c_str(), 20);
+    u.username[20] = '\0';
+    strncpy(u.password, pass.c_str(), 40);
+    u.password[40] = '\0';
+
+AddUser(u, filename);
+cout << "Регистрация завершена. Ваш ID = " << u.id << ".\n";
+currentUserGlobal = u;
+currentUserId = u.id;
+}
+
+//---------------------------------------------------------------------------------------------//
+// Ввод логина/пароля и попытка аутентификации 
+void LoginInteractiveLoop(const string& filename = "login.bin") {
+cout << "\n-+-+-+-+-+-+Вход в систему-+-+-+-+-+-+\n";
+    while (true) {
+string name, pass;
+cout << "Логин: ";
+getline(cin, name);
+cout << "Пароль: ";
+getline(cin, pass);
+User u{};
+    if (AuthenticateUser(name, pass, u, filename)) {
+currentUserGlobal = u;
+currentUserId = u.id;
+cout << "Успешный вход. Привет пользователь " << string(u.username) << "!\n";
+    break;
+}
+    else {
+cout << "Неверный логин или пароль, попробуйте ещё раз\n";
+    }
+    }
+}
+
+//---------------------------------------------------------------------------------------------//
+// Проверка: есть ли в системе хотя бы один пользователь
+bool HasAnyUser(const string& filename = "login.bin") {
+ifstream in(filename, ios::binary);
+    if (!in) return false;
+User tmp;
+bool any = false;
+    if (in.read(reinterpret_cast<char*>(&tmp), sizeof(User))) any = true;
+in.close();
+    return any;
+}
+
+//---------------------------------------------------------------------------------------------//
+//  Функция, управлящая первым экраном регистрации/входа.
+
+void EnsureAuthenticated(const string& filename = "login.bin") {
+currentUserId = -1;
+memset(&currentUserGlobal, 0, sizeof(currentUserGlobal));
+
+bool exists = HasAnyUser(filename);
+    if (!exists) {
+cout << "Сначала нужно зарегистрироваться!\n";
+RegisterInteractiveUser(filename);
+}
+    else {
+LoginInteractiveLoop(filename);
+    }
+}
+
+//---------------------------------------------------------------------------------------------//
+// Функция логирования действий пользователя 
+void LogActionUser(int userId, const string& action, int gameId = -1, const string& filename = "deystviya.log") {
+ofstream out(filename, ios::app);
+    if (!out) return;
+time_t t = time(nullptr);
+out << t << " | user:" << userId << " | game:" << gameId << " | " << action << '\n';
+out.close();
+}
+
+
+
 int main() {
 // для вывода кириллицы
-SetConsoleEncoding();
+    SetConsoleEncoding();
+    EnsureAuthenticated();
 
-vector<Game> games;
+    vector<Game> games;
+    games = ReadAllGamesFromFile();
 
 int choice;
 bool changesSaved = false; // Специальный флаг для отслеживания, сохранялись ли изменения
